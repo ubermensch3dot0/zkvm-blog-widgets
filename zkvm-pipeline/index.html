@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ZKVM Pipeline</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { background: #0d1117; overflow: hidden; }
+  body { display: flex; justify-content: center; padding: 28px 16px; }
+  svg { max-width: 720px; width: 100%; height: auto; }
+</style>
+</head>
+<body>
+<svg viewBox="0 0 740 310" xmlns="http://www.w3.org/2000/svg" font-family="'SF Mono','Fira Code','Cascadia Code','Consolas',monospace">
+  <defs>
+    <marker id="ar" viewBox="0 0 10 7" refX="9" refY="3.5"
+            markerWidth="7" markerHeight="5.5" orient="auto">
+      <path d="M0 0L10 3.5L0 7z" fill="#58a6ff"/>
+    </marker>
+  </defs>
+
+  <!-- Title -->
+  <text x="370" y="24" text-anchor="middle" fill="#8b949e" font-size="11" font-weight="700" letter-spacing="0.08em">THE ZKVM PIPELINE</text>
+
+  <!-- ═══ Step 1: Compile ═══ -->
+  <rect x="20" y="52" width="120" height="68" rx="10" fill="#161b22" stroke="#d2a8ff" stroke-width="1.3"/>
+  <text x="80" y="78" text-anchor="middle" fill="#d2a8ff" font-size="20">&#x1F4DD;</text>
+  <text x="80" y="102" text-anchor="middle" fill="#d2a8ff" font-size="11" font-weight="600">Compile</text>
+  <!-- Description -->
+  <text x="80" y="142" text-anchor="middle" fill="#8b949e" font-size="9.5">High-level code</text>
+  <text x="80" y="155" text-anchor="middle" fill="#484f58" font-size="9">&rarr; VM instructions</text>
+
+  <!-- Arrow 1→2 -->
+  <line x1="140" y1="86" x2="162" y2="86" stroke="#58a6ff" stroke-width="1.3" marker-end="url(#ar)"/>
+
+  <!-- ═══ Step 2: Execute ═══ -->
+  <rect x="164" y="52" width="120" height="68" rx="10" fill="#161b22" stroke="#58a6ff" stroke-width="1.3"/>
+  <text x="224" y="78" text-anchor="middle" fill="#58a6ff" font-size="20">&#x2699;</text>
+  <text x="224" y="102" text-anchor="middle" fill="#58a6ff" font-size="11" font-weight="600">Execute</text>
+  <!-- Description -->
+  <text x="224" y="142" text-anchor="middle" fill="#8b949e" font-size="9.5">Run on VM, record</text>
+  <text x="224" y="155" text-anchor="middle" fill="#484f58" font-size="9">execution trace</text>
+
+  <!-- Arrow 2→3 -->
+  <line x1="284" y1="86" x2="306" y2="86" stroke="#58a6ff" stroke-width="1.3" marker-end="url(#ar)"/>
+
+  <!-- ═══ Step 3: Arithmetize ═══ -->
+  <rect x="308" y="52" width="120" height="68" rx="10" fill="#161b22" stroke="#ffa657" stroke-width="1.3"/>
+  <text x="368" y="78" text-anchor="middle" fill="#ffa657" font-size="20">&#x1D453;</text>
+  <text x="368" y="102" text-anchor="middle" fill="#ffa657" font-size="11" font-weight="600">Arithmetize</text>
+  <!-- Description -->
+  <text x="368" y="142" text-anchor="middle" fill="#8b949e" font-size="9.5">VM rules become</text>
+  <text x="368" y="155" text-anchor="middle" fill="#484f58" font-size="9">polynomial constraints</text>
+
+  <!-- Arrow 3→4 -->
+  <line x1="428" y1="86" x2="450" y2="86" stroke="#58a6ff" stroke-width="1.3" marker-end="url(#ar)"/>
+
+  <!-- ═══ Step 4: Prove ═══ -->
+  <rect x="452" y="52" width="120" height="68" rx="10" fill="#161b22" stroke="#f85149" stroke-width="1.3"/>
+  <text x="512" y="78" text-anchor="middle" fill="#f85149" font-size="20">&#x1F512;</text>
+  <text x="512" y="102" text-anchor="middle" fill="#f85149" font-size="11" font-weight="600">Prove</text>
+  <!-- Description -->
+  <text x="512" y="142" text-anchor="middle" fill="#8b949e" font-size="9.5">Commit, FRI, produce</text>
+  <text x="512" y="155" text-anchor="middle" fill="#484f58" font-size="9">succinct STARK proof</text>
+
+  <!-- Arrow 4→5 -->
+  <line x1="572" y1="86" x2="594" y2="86" stroke="#58a6ff" stroke-width="1.3" marker-end="url(#ar)"/>
+
+  <!-- ═══ Step 5: Verify ═══ -->
+  <rect x="596" y="52" width="120" height="68" rx="10" fill="#161b22" stroke="#3fb950" stroke-width="1.3"/>
+  <text x="656" y="78" text-anchor="middle" fill="#3fb950" font-size="20">&#x2713;</text>
+  <text x="656" y="102" text-anchor="middle" fill="#3fb950" font-size="11" font-weight="600">Verify</text>
+  <!-- Description -->
+  <text x="656" y="142" text-anchor="middle" fill="#8b949e" font-size="9.5">Check proof, never</text>
+  <text x="656" y="155" text-anchor="middle" fill="#484f58" font-size="9">re-execute program</text>
+
+  <!-- ═══ Bottom annotation: what flows between steps ═══ -->
+  <line x1="80" y1="178" x2="80" y2="194" stroke="#30363d" stroke-width="1" stroke-dasharray="2,2"/>
+  <line x1="224" y1="178" x2="224" y2="194" stroke="#30363d" stroke-width="1" stroke-dasharray="2,2"/>
+  <line x1="368" y1="178" x2="368" y2="194" stroke="#30363d" stroke-width="1" stroke-dasharray="2,2"/>
+  <line x1="512" y1="178" x2="512" y2="194" stroke="#30363d" stroke-width="1" stroke-dasharray="2,2"/>
+  <line x1="656" y1="178" x2="656" y2="194" stroke="#30363d" stroke-width="1" stroke-dasharray="2,2"/>
+
+  <!-- Data labels -->
+  <rect x="30" y="196" width="100" height="24" rx="5" fill="#0d1117" stroke="#30363d" stroke-width="0.8"/>
+  <text x="80" y="212" text-anchor="middle" fill="#484f58" font-size="9">program.rs</text>
+
+  <rect x="174" y="196" width="100" height="24" rx="5" fill="#0d1117" stroke="#30363d" stroke-width="0.8"/>
+  <text x="224" y="212" text-anchor="middle" fill="#484f58" font-size="9">trace table</text>
+
+  <rect x="318" y="196" width="100" height="24" rx="5" fill="#0d1117" stroke="#30363d" stroke-width="0.8"/>
+  <text x="368" y="212" text-anchor="middle" fill="#484f58" font-size="9">C(x), Q(x)</text>
+
+  <rect x="462" y="196" width="100" height="24" rx="5" fill="#0d1117" stroke="#30363d" stroke-width="0.8"/>
+  <text x="512" y="212" text-anchor="middle" fill="#484f58" font-size="9">STARK proof</text>
+
+  <rect x="606" y="196" width="100" height="24" rx="5" fill="#0d1117" stroke="#30363d" stroke-width="0.8"/>
+  <text x="656" y="212" text-anchor="middle" fill="#3fb950" font-size="9">&#x2713; / &#x2717;</text>
+
+  <!-- ═══ Asymmetry annotation ═══ -->
+  <rect x="148" y="252" width="300" height="40" rx="8" fill="#161b22" stroke="#f8514940" stroke-width="1"/>
+  <text x="175" y="272" fill="#f85149" font-size="18">&#x1F4AA;</text>
+  <text x="200" y="272" fill="#f85149" font-size="10" font-weight="600">Prover: heavy computation</text>
+  <text x="200" y="286" fill="#484f58" font-size="9">interpolation, FRI folding, Merkle trees</text>
+
+  <rect x="468" y="252" width="240" height="40" rx="8" fill="#161b22" stroke="#3fb95040" stroke-width="1"/>
+  <text x="495" y="272" fill="#3fb950" font-size="18">&#x26A1;</text>
+  <text x="520" y="272" fill="#3fb950" font-size="10" font-weight="600">Verifier: fast checks</text>
+  <text x="520" y="286" fill="#484f58" font-size="9">a few hashes + field ops</text>
+
+</svg>
+</body>
+</html>
