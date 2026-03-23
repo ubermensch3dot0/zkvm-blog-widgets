@@ -45,7 +45,7 @@
   .inst.active .inst-pc { color: #58a6ff; }
   .inst-op { color: inherit; }
   .inst.active .inst-op { color: #d2a8ff; font-weight: 600; }
-  .inst-args { margin-left: 6px; }
+  .inst-args { margin-left: 8px; color: #6e7681; font-size: 11px; }
   .inst.active .inst-args { color: #c9d1d9; }
   .inst.done { color: #484f58; }
   .inst.done .inst-addr { color: #30363d; }
@@ -145,12 +145,11 @@
 
 <script>
 const PROGRAM = [
-  { op: 'IMM', args: 'r0, 3',       rd: 0, rs1: -1, rs2: -1, imm: 3, type: 'imm' },
-  { op: 'IMM', args: 'r1, 4',       rd: 1, rs1: -1, rs2: -1, imm: 4, type: 'imm' },
-  { op: 'ADD', args: 'r2, r0, r1',  rd: 2, rs1: 0,  rs2: 1,  imm: 0, type: 'alu' },
-  { op: 'MUL', args: 'r3, r2, r2',  rd: 3, rs1: 2,  rs2: 2,  imm: 0, type: 'alu' },
-  { op: 'SUB', args: 'r0, r3, r2',  rd: 0, rs1: 3,  rs2: 2,  imm: 0, type: 'alu' },
-  { op: 'HALT', args: '',           rd: -1, rs1: -1, rs2: -1, imm: 0, type: 'halt' },
+  { op: 'LOAD', args: 'r0, 10',      rd: 0, rs1: -1, rs2: -1, imm: 10, type: 'imm',  desc: 'r0 = 10' },
+  { op: 'LOAD', args: 'r1, 3',       rd: 1, rs1: -1, rs2: -1, imm: 3,  type: 'imm',  desc: 'r1 = 3' },
+  { op: 'ADD',  args: 'r2, r0, r1',  rd: 2, rs1: 0,  rs2: 1,  imm: 0,  type: 'alu',  desc: 'r2 = r0 + r1' },
+  { op: 'ADD',  args: 'r0, r2, r1',  rd: 0, rs1: 2,  rs2: 1,  imm: 0,  type: 'alu',  desc: 'r0 = r2 + r1' },
+  { op: 'HALT', args: '',            rd: -1, rs1: -1, rs2: -1, imm: 0,  type: 'halt', desc: 'stop' },
 ];
 
 let regs = [0, 0, 0, 0];
@@ -172,7 +171,7 @@ function render() {
       <span class="inst-pc">${i === pc && !halted ? '▸' : ''}</span>
       <span class="inst-addr">${i}</span>
       <span class="inst-op">${inst.op}</span>
-      <span class="inst-args">${inst.args}</span>
+      <span class="inst-args">${inst.desc}</span>
     </div>`;
   }).join('');
 
@@ -223,11 +222,11 @@ function step() {
     // Decode
     const inst = PROGRAM[pc];
     if (inst.type === 'halt') {
-      setStatus(`Decode: HALT`, true);
+      setStatus(`Decode: HALT instruction`, true);
     } else if (inst.type === 'imm') {
-      setStatus(`Decode: ${inst.op} → write ${inst.imm} to r${inst.rd}`, true);
+      setStatus(`Decode: load value ${inst.imm} into r${inst.rd}`, true);
     } else {
-      setStatus(`Decode: ${inst.op} → read r${inst.rs1}, r${inst.rs2} → write r${inst.rd}`, true);
+      setStatus(`Decode: ${inst.op} → read r${inst.rs1}` + (inst.rs2 !== inst.rs1 ? ` and r${inst.rs2}` : ` (both operands)`) + `, write result to r${inst.rd}`, true);
       readRegs = [inst.rs1];
       if (inst.rs2 !== inst.rs1) readRegs.push(inst.rs2);
     }
@@ -255,7 +254,7 @@ function step() {
     if (inst.type === 'halt') {
       halted = true;
       phase = 0;
-      setStatus('Machine halted. Final state: r0 = ' + regs[0], false);
+      setStatus('Machine halted. Final registers: r0=' + regs[0] + ', r1=' + regs[1] + ', r2=' + regs[2], false);
     } else if (inst.type === 'imm') {
       regs[inst.rd] = inst.imm;
       changedReg = inst.rd;
