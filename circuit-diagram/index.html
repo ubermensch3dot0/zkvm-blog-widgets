@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Arithmetic Circuit: x² + x + 5</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #0d1117;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    padding: 24px 16px;
+  }
+  svg { max-width: 460px; width: 100%; height: auto; }
+</style>
+</head>
+<body>
+<svg viewBox="0 0 460 390" xmlns="http://www.w3.org/2000/svg" font-family="'SF Mono','Fira Code','Cascadia Code','Consolas',monospace">
+  <defs>
+    <marker id="a" viewBox="0 0 10 7" refX="9" refY="3.5"
+            markerWidth="7" markerHeight="5.5" orient="auto-start-reverse">
+      <path d="M0 0L10 3.5L0 7z" fill="#484f58"/>
+    </marker>
+    <marker id="ao" viewBox="0 0 10 7" refX="9" refY="3.5"
+            markerWidth="7" markerHeight="5.5" orient="auto-start-reverse">
+      <path d="M0 0L10 3.5L0 7z" fill="#ffa657"/>
+    </marker>
+    <marker id="ab" viewBox="0 0 10 7" refX="9" refY="3.5"
+            markerWidth="7" markerHeight="5.5" orient="auto-start-reverse">
+      <path d="M0 0L10 3.5L0 7z" fill="#58a6ff"/>
+    </marker>
+  </defs>
+
+  <!-- ─── Input x ─── -->
+  <text x="175" y="16" text-anchor="middle" fill="#484f58" font-size="11" letter-spacing="0.05em">INPUT</text>
+  <circle cx="175" cy="38" r="16" fill="none" stroke="#58a6ff" stroke-width="1.5"/>
+  <text x="175" y="43" text-anchor="middle" fill="#58a6ff" font-size="15" font-weight="600">x</text>
+
+  <!-- ─── Wire: x down to branch ─── -->
+  <line x1="175" y1="54" x2="175" y2="68" stroke="#484f58" stroke-width="1.5"/>
+  <circle cx="175" cy="68" r="3" fill="#58a6ff"/>
+
+  <!-- ─── x bypass bus (right side) ─── -->
+  <path d="M175 68 L290 68 L290 203" stroke="#58a6ff" stroke-width="1.5"
+        stroke-dasharray="5,3.5" fill="none" opacity="0.5"/>
+  <line x1="290" y1="203" x2="218" y2="203" stroke="#58a6ff" stroke-width="1.5" marker-end="url(#ab)"/>
+  <text x="296" y="139" fill="#58a6ff" font-size="10" opacity="0.6">x</text>
+
+  <!-- ─── Wire: branch down to MUL ─── -->
+  <line x1="175" y1="68" x2="175" y2="96" stroke="#484f58" stroke-width="1.5" marker-end="url(#a)"/>
+
+  <!-- ─── MUL gate ─── -->
+  <rect x="133" y="96" width="84" height="42" rx="8" fill="#0d1117" stroke="#30363d" stroke-width="1.5"/>
+  <text x="175" y="122" text-anchor="middle" fill="#d2a8ff" font-size="18" font-weight="700">&times;</text>
+
+  <!-- Annotation -->
+  <text x="232" y="121" fill="#8b949e" font-size="12">&larr; x &middot; x = x&sup2;</text>
+
+  <!-- ─── Wire: MUL → ADD1 ─── -->
+  <line x1="175" y1="138" x2="175" y2="182" stroke="#484f58" stroke-width="1.5" marker-end="url(#a)"/>
+
+  <!-- ─── ADD1 gate ─── -->
+  <rect x="133" y="182" width="84" height="42" rx="8" fill="#0d1117" stroke="#30363d" stroke-width="1.5"/>
+  <text x="175" y="208" text-anchor="middle" fill="#d2a8ff" font-size="18" font-weight="700">+</text>
+
+  <!-- Annotation -->
+  <text x="232" y="207" fill="#8b949e" font-size="12">&larr; x&sup2; + x</text>
+
+  <!-- ─── Wire: ADD1 → ADD2 ─── -->
+  <line x1="175" y1="224" x2="175" y2="268" stroke="#484f58" stroke-width="1.5" marker-end="url(#a)"/>
+
+  <!-- ─── Constant 5 ─── -->
+  <rect x="62" y="278" width="34" height="24" rx="6" fill="#0d1117" stroke="#ffa657" stroke-width="1.2"/>
+  <text x="79" y="295" text-anchor="middle" fill="#ffa657" font-size="13" font-weight="600">5</text>
+  <line x1="96" y1="290" x2="132" y2="290" stroke="#ffa657" stroke-width="1.5" marker-end="url(#ao)" opacity="0.8"/>
+
+  <!-- ─── ADD2 gate ─── -->
+  <rect x="133" y="268" width="84" height="42" rx="8" fill="#0d1117" stroke="#30363d" stroke-width="1.5"/>
+  <text x="175" y="294" text-anchor="middle" fill="#d2a8ff" font-size="18" font-weight="700">+</text>
+
+  <!-- Annotation -->
+  <text x="232" y="293" fill="#8b949e" font-size="12">&larr; x&sup2; + x + 5</text>
+
+  <!-- ─── Wire: ADD2 → output ─── -->
+  <line x1="175" y1="310" x2="175" y2="340" stroke="#484f58" stroke-width="1.5" marker-end="url(#a)"/>
+
+  <!-- ─── Output y ─── -->
+  <circle cx="175" cy="357" r="16" fill="none" stroke="#3fb950" stroke-width="1.5"/>
+  <text x="175" y="362" text-anchor="middle" fill="#3fb950" font-size="15" font-weight="600">y</text>
+  <text x="175" y="385" text-anchor="middle" fill="#484f58" font-size="11" letter-spacing="0.05em">OUTPUT</text>
+</svg>
+</body>
+</html>
