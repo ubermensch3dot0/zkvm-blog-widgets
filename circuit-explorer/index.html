@@ -170,45 +170,6 @@ body {
   text-align: center; font-size: 12px; color: var(--text-faint); margin-top: 12px;
 }
 
-/* ── Constraints ── */
-.constraints { display: flex; flex-direction: column; gap: 2px; }
-
-.cst {
-  display: flex; align-items: center; gap: 10px;
-  padding: 8px 10px; border-radius: 8px; transition: background 0.15s;
-}
-.cst:hover { background: var(--card-hover); }
-
-.cst-icon { font-size: 14px; width: 20px; text-align: center; flex-shrink: 0; }
-.cst.pass .cst-icon { color: var(--green); }
-.cst.fail .cst-icon { color: var(--red); }
-
-.cst-eq {
-  font-family: var(--mono); font-size: 13px; color: var(--text-muted); min-width: 100px;
-}
-.cst.fail .cst-eq { color: var(--red); }
-
-.cst-detail {
-  font-family: var(--mono); font-size: 13px; color: var(--text-faint);
-  margin-left: auto; text-align: right;
-}
-.cst.fail .cst-detail { color: rgba(248, 81, 73, 0.7); }
-
-/* ── Summary ── */
-.summary {
-  display: flex; align-items: center; justify-content: center; gap: 8px;
-  margin-top: 12px; padding: 10px; border-radius: 8px;
-  font-family: var(--mono); font-size: 13px; font-weight: 500;
-  transition: all 0.25s;
-}
-.summary.pass {
-  background: var(--green-dim); color: var(--green);
-  border: 1px solid rgba(63, 185, 80, 0.25);
-}
-.summary.fail {
-  background: var(--red-dim); color: var(--red);
-  border: 1px solid rgba(248, 81, 73, 0.25);
-}
 </style>
 </head>
 <body>
@@ -258,13 +219,12 @@ body {
     { op: '+',      sym: '<span class="rv">v\u2083</span> + <span class="rc">5</span>',             name: 'out',     key: 'out' },
   ];
 
-  /* ── constraints ── */
-  const cstDefs = [
-    { eq: 'v\u2081 = x \u00b7 x',   lhs: () => v.v1,  rhs: () => x * x,       detail: () => `${v.v1} ${v.v1 === x*x ? '=' : '\u2260'} ${x}\u00b7${x} = ${x*x}` },
-    { eq: 'v\u2082 = v\u2081 \u00b7 x', lhs: () => v.v2, rhs: () => v.v1 * x,  detail: () => `${v.v2} ${v.v2 === v.v1*x ? '=' : '\u2260'} ${v.v1}\u00b7${x} = ${v.v1*x}` },
-    { eq: 'v\u2083 = v\u2082 + x',   lhs: () => v.v3,  rhs: () => v.v2 + x,    detail: () => `${v.v3} ${v.v3 === v.v2+x ? '=' : '\u2260'} ${v.v2}+${x} = ${v.v2+x}` },
-    { eq: 'out = v\u2083 + 5',       lhs: () => v.out, rhs: () => v.v3 + 5,     detail: () => `${v.out} ${v.out === v.v3+5 ? '=' : '\u2260'} ${v.v3}+5 = ${v.v3+5}` },
-    { eq: 'out = 35',                lhs: () => v.out, rhs: () => 35,            detail: () => `${v.out} ${v.out === 35 ? '=' : '\u2260'} 35` },
+  /* ── constraint checks (for gate highlighting) ── */
+  const cstChecks = [
+    () => v.v1 === x * x,
+    () => v.v2 === v.v1 * x,
+    () => v.v3 === v.v2 + x,
+    () => v.out === v.v3 + 5,
   ];
 
   /* ── build static circuit DOM ── */
@@ -324,14 +284,12 @@ body {
     document.getElementById('x-val').textContent = x;
     document.getElementById('x-slider').value = x;
 
-    // badges
+    // badges + gate highlighting
     gates.forEach((g, i) => {
       const b = document.getElementById('b-' + g.key);
       if (!b.querySelector('input')) b.textContent = v[g.key];
       b.classList.toggle('tampered', tampered.has(g.key));
-      // gate border
-      const pass = cstDefs[i].lhs() === cstDefs[i].rhs();
-      document.getElementById('g' + i).classList.toggle('fail', !pass);
+      document.getElementById('g' + i).classList.toggle('fail', !cstChecks[i]());
     });
 
     // output check
@@ -339,28 +297,6 @@ body {
     const oc = document.getElementById('oc');
     oc.className = 'output-check ' + (outOk ? 'pass' : 'fail');
     document.getElementById('oc-icon').textContent = outOk ? '\u2713' : '\u2717';
-
-    // constraints
-    let nPass = 0;
-    document.getElementById('constraints').innerHTML = cstDefs.map(c => {
-      const ok = c.lhs() === c.rhs(); if (ok) nPass++;
-      return `<div class="cst ${ok ? 'pass' : 'fail'}">
-        <span class="cst-icon">${ok ? '\u2713' : '\u2717'}</span>
-        <span class="cst-eq">${c.eq}</span>
-        <span class="cst-detail">${c.detail()}</span>
-      </div>`;
-    }).join('');
-
-    // summary
-    const s = document.getElementById('summary');
-    const total = cstDefs.length;
-    if (nPass === total) {
-      s.className = 'summary pass';
-      s.textContent = `\u2713 Valid witness \u2014 all ${total} constraints satisfied`;
-    } else {
-      s.className = 'summary fail';
-      s.textContent = `\u2717 Invalid witness \u2014 ${total - nPass} of ${total} constraints violated`;
-    }
   }
 
   /* ── events ── */
