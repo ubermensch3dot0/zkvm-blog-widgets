@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ZK Circuit Explorer</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg: #0d1117;
+  --card: #161b22;
+  --card-hover: #1c2128;
+  --border: #30363d;
+  --border-light: #21262d;
+  --text: #e6edf3;
+  --text-muted: #8b949e;
+  --text-faint: #484f58;
+  --accent: #58a6ff;
+  --accent-dim: #1f3a5f;
+  --purple: #d2a8ff;
+  --orange: #ffa657;
+  --green: #3fb950;
+  --green-dim: #0f2d16;
+  --red: #f85149;
+  --red-dim: #3d1214;
+  --mono: 'SF Mono', 'Fira Code', 'Cascadia Code', 'Consolas', monospace;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, sans-serif;
+  display: flex;
+  justify-content: center;
+  padding: 24px 16px;
+  line-height: 1.5;
+}
+
+.widget { max-width: 640px; width: 100%; }
+
+/* ── Header ── */
+.widget-title { font-size: 18px; font-weight: 600; margin-bottom: 6px; }
+.widget-subtitle {
+  font-size: 14px; color: var(--text-muted); margin-bottom: 20px; line-height: 1.6;
+}
+.widget-subtitle code {
+  font-family: var(--mono); font-size: 13px;
+  background: var(--border-light); padding: 1px 5px; border-radius: 4px; color: var(--text);
+}
+
+/* ── Cards ── */
+.card {
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: 12px; padding: 20px; margin-bottom: 12px;
+}
+.card-header {
+  display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;
+}
+.card-title {
+  font-size: 11px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.08em; color: var(--text-muted);
+}
+
+/* ── Buttons ── */
+.btn-reset {
+  font-family: inherit; font-size: 11px; color: var(--text-muted);
+  background: var(--border-light); border: 1px solid var(--border);
+  border-radius: 6px; padding: 3px 10px; cursor: pointer; transition: all 0.15s;
+}
+.btn-reset:hover { background: var(--border); color: var(--text); }
+
+/* ── X input ── */
+.x-control { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; }
+.x-label { font-family: var(--mono); font-size: 15px; font-weight: 600; color: var(--accent); }
+
+.x-slider {
+  flex: 1; -webkit-appearance: none; appearance: none;
+  height: 4px; background: var(--border); border-radius: 2px; outline: none;
+}
+.x-slider::-webkit-slider-thumb {
+  -webkit-appearance: none; width: 16px; height: 16px;
+  border-radius: 50%; background: var(--accent); cursor: pointer;
+}
+.x-slider::-moz-range-thumb {
+  width: 16px; height: 16px; border: none;
+  border-radius: 50%; background: var(--accent); cursor: pointer;
+}
+
+.x-display {
+  font-family: var(--mono); font-size: 18px; font-weight: 700; color: var(--accent);
+  background: var(--bg); border: 1px solid var(--border);
+  border-radius: 8px; padding: 4px 14px; min-width: 48px; text-align: center;
+}
+
+/* ── Circuit ── */
+.circuit { display: flex; flex-direction: column; align-items: center; }
+
+.wire {
+  width: 2px; height: 14px; background: var(--border);
+  transition: background 0.2s;
+}
+
+.gate {
+  display: flex; align-items: center;
+  background: var(--bg); border: 1.5px solid var(--border); border-radius: 10px;
+  padding: 10px 14px; gap: 10px; width: 100%; max-width: 460px;
+  transition: border-color 0.25s, box-shadow 0.25s;
+}
+.gate.fail {
+  border-color: var(--red);
+  box-shadow: 0 0 16px -4px rgba(248, 81, 73, 0.25);
+}
+
+.gate-op {
+  font-family: var(--mono); font-size: 16px; font-weight: 700; color: var(--purple);
+  background: var(--border-light); border-radius: 6px;
+  width: 32px; height: 32px; display: flex; align-items: center;
+  justify-content: center; flex-shrink: 0;
+}
+
+.gate-body {
+  display: flex; align-items: center; flex: 1; gap: 8px; min-width: 0;
+}
+
+.gate-formula {
+  font-family: var(--mono); font-size: 14px; color: var(--text-muted); white-space: nowrap;
+}
+.gate-formula .rx { color: var(--accent); }
+.gate-formula .rv { color: var(--text); }
+.gate-formula .rc { color: var(--orange); }
+
+.gate-arrow { color: var(--text-faint); font-size: 13px; flex-shrink: 0; }
+
+.gate-output {
+  display: flex; align-items: center; gap: 6px; margin-left: auto; flex-shrink: 0;
+}
+.gate-output-name {
+  font-family: var(--mono); font-size: 12px; color: var(--text-faint);
+}
+
+/* ── Value badges ── */
+.val {
+  font-family: var(--mono); font-size: 15px; font-weight: 600; color: var(--text);
+  background: var(--border-light); border: 1px solid var(--border); border-radius: 6px;
+  padding: 3px 10px; min-width: 40px; text-align: center;
+  cursor: pointer; transition: all 0.15s; user-select: none;
+}
+.val:hover { border-color: var(--accent); background: var(--accent-dim); }
+.val.tampered { color: var(--red); border-color: var(--red); background: var(--red-dim); }
+.val input {
+  font-family: var(--mono); font-size: 15px; font-weight: 600; color: var(--accent);
+  background: transparent; border: none; outline: none;
+  width: 64px; text-align: center; padding: 0;
+}
+
+/* ── Output check ── */
+.output-check {
+  display: flex; align-items: center; justify-content: center; gap: 10px;
+  width: 100%; max-width: 460px; padding: 10px 16px; border-radius: 10px;
+  border: 2px solid var(--border); font-family: var(--mono); font-size: 14px;
+  transition: all 0.25s;
+}
+.output-check.pass { border-color: var(--green); background: var(--green-dim); color: var(--green); }
+.output-check.fail { border-color: var(--red); background: var(--red-dim); color: var(--red); }
+.check-icon { font-size: 18px; font-weight: 700; }
+
+.hint {
+  text-align: center; font-size: 12px; color: var(--text-faint); margin-top: 12px;
+}
+
+/* ── Constraints ── */
+.constraints { display: flex; flex-direction: column; gap: 2px; }
+
+.cst {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 10px; border-radius: 8px; transition: background 0.15s;
+}
+.cst:hover { background: var(--card-hover); }
+
+.cst-icon { font-size: 14px; width: 20px; text-align: center; flex-shrink: 0; }
+.cst.pass .cst-icon { color: var(--green); }
+.cst.fail .cst-icon { color: var(--red); }
+
+.cst-eq {
+  font-family: var(--mono); font-size: 13px; color: var(--text-muted); min-width: 100px;
+}
+.cst.fail .cst-eq { color: var(--red); }
+
+.cst-detail {
+  font-family: var(--mono); font-size: 13px; color: var(--text-faint);
+  margin-left: auto; text-align: right;
+}
+.cst.fail .cst-detail { color: rgba(248, 81, 73, 0.7); }
+
+/* ── Summary ── */
+.summary {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  margin-top: 12px; padding: 10px; border-radius: 8px;
+  font-family: var(--mono); font-size: 13px; font-weight: 500;
+  transition: all 0.25s;
+}
+.summary.pass {
+  background: var(--green-dim); color: var(--green);
+  border: 1px solid rgba(63, 185, 80, 0.25);
+}
+.summary.fail {
+  background: var(--red-dim); color: var(--red);
+  border: 1px solid rgba(248, 81, 73, 0.25);
+}
+</style>
+</head>
+<body>
+<div class="widget">
+  <div class="widget-title">Arithmetic Circuit Explorer</div>
+  <p class="widget-subtitle">
+    Proving knowledge of <code>x</code> such that <code>x&sup3; + x + 5 = 35</code>.
+    Each gate produces a constraint equation. A valid <em>witness</em> is a set of wire
+    values that satisfies every constraint simultaneously.
+  </p>
+
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">Circuit</span>
+      <button class="btn-reset" id="btn-reset">Reset</button>
+    </div>
+
+    <div class="x-control">
+      <span class="x-label">x =</span>
+      <input type="range" class="x-slider" id="x-slider" min="0" max="10" value="3">
+      <span class="x-display" id="x-val">3</span>
+    </div>
+
+    <div class="circuit" id="circuit"></div>
+    <p class="hint">Click any output value to tamper with the witness</p>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">Gate Constraints</span>
+    </div>
+    <div class="constraints" id="constraints"></div>
+    <div class="summary" id="summary"></div>
+  </div>
+</div>
+
+<script>
+(function () {
+  /* ── state ── */
+  let x = 3;
+  let v = { v1: 9, v2: 27, v3: 30, out: 35 };
+  const tampered = new Set();
+
+  const honest = x => {
+    const v1 = x * x, v2 = v1 * x, v3 = v2 + x, out = v3 + 5;
+    return { v1, v2, v3, out };
+  };
+
+  /* ── gate meta ── */
+  const gates = [
+    { op: '\u00d7', sym: '<span class="rx">x</span> \u00b7 <span class="rx">x</span>',             name: 'v\u2081', key: 'v1' },
+    { op: '\u00d7', sym: '<span class="rv">v\u2081</span> \u00b7 <span class="rx">x</span>',       name: 'v\u2082', key: 'v2' },
+    { op: '+',      sym: '<span class="rv">v\u2082</span> + <span class="rx">x</span>',             name: 'v\u2083', key: 'v3' },
+    { op: '+',      sym: '<span class="rv">v\u2083</span> + <span class="rc">5</span>',             name: 'out',     key: 'out' },
+  ];
+
+  /* ── constraints ── */
+  const cstDefs = [
+    { eq: 'v\u2081 = x \u00b7 x',   lhs: () => v.v1,  rhs: () => x * x,       detail: () => `${v.v1} ${v.v1 === x*x ? '=' : '\u2260'} ${x}\u00b7${x} = ${x*x}` },
+    { eq: 'v\u2082 = v\u2081 \u00b7 x', lhs: () => v.v2, rhs: () => v.v1 * x,  detail: () => `${v.v2} ${v.v2 === v.v1*x ? '=' : '\u2260'} ${v.v1}\u00b7${x} = ${v.v1*x}` },
+    { eq: 'v\u2083 = v\u2082 + x',   lhs: () => v.v3,  rhs: () => v.v2 + x,    detail: () => `${v.v3} ${v.v3 === v.v2+x ? '=' : '\u2260'} ${v.v2}+${x} = ${v.v2+x}` },
+    { eq: 'out = v\u2083 + 5',       lhs: () => v.out, rhs: () => v.v3 + 5,     detail: () => `${v.out} ${v.out === v.v3+5 ? '=' : '\u2260'} ${v.v3}+5 = ${v.v3+5}` },
+    { eq: 'out = 35',                lhs: () => v.out, rhs: () => 35,            detail: () => `${v.out} ${v.out === 35 ? '=' : '\u2260'} 35` },
+  ];
+
+  /* ── build static circuit DOM ── */
+  function buildCircuit() {
+    const el = document.getElementById('circuit');
+    let h = '';
+    gates.forEach((g, i) => {
+      if (i > 0) h += '<div class="wire"></div>';
+      h += `<div class="gate" id="g${i}">
+        <div class="gate-op">${g.op}</div>
+        <div class="gate-body">
+          <div class="gate-formula">${g.sym}</div>
+          <span class="gate-arrow">\u2192</span>
+          <div class="gate-output">
+            <span class="gate-output-name">${g.name} =</span>
+            <div class="val" id="b-${g.key}" data-k="${g.key}">${v[g.key]}</div>
+          </div>
+        </div>
+      </div>`;
+    });
+    h += '<div class="wire"></div>';
+    h += `<div class="output-check" id="oc">
+            <span>out = 35 ?</span>
+            <span class="check-icon" id="oc-icon">\u2713</span>
+          </div>`;
+    el.innerHTML = h;
+    el.querySelectorAll('.val').forEach(b => b.addEventListener('click', () => edit(b)));
+  }
+
+  /* ── inline editing ── */
+  function edit(badge) {
+    if (badge.querySelector('input')) return;
+    const k = badge.dataset.k, cur = v[k];
+    badge.innerHTML = `<input type="number" value="${cur}">`;
+    const inp = badge.querySelector('input');
+    inp.focus(); inp.select();
+    let done = false;
+    const finish = () => {
+      if (done) return; done = true;
+      const n = parseInt(inp.value);
+      if (!isNaN(n)) {
+        v[k] = n;
+        const h = honest(x);
+        n !== h[k] ? tampered.add(k) : tampered.delete(k);
+      }
+      render();
+    };
+    inp.addEventListener('blur', finish);
+    inp.addEventListener('keydown', e => {
+      if (e.key === 'Enter') inp.blur();
+      if (e.key === 'Escape') { done = true; render(); }
+    });
+  }
+
+  /* ── render ── */
+  function render() {
+    document.getElementById('x-val').textContent = x;
+    document.getElementById('x-slider').value = x;
+
+    // badges
+    gates.forEach((g, i) => {
+      const b = document.getElementById('b-' + g.key);
+      if (!b.querySelector('input')) b.textContent = v[g.key];
+      b.classList.toggle('tampered', tampered.has(g.key));
+      // gate border
+      const pass = cstDefs[i].lhs() === cstDefs[i].rhs();
+      document.getElementById('g' + i).classList.toggle('fail', !pass);
+    });
+
+    // output check
+    const outOk = v.out === 35;
+    const oc = document.getElementById('oc');
+    oc.className = 'output-check ' + (outOk ? 'pass' : 'fail');
+    document.getElementById('oc-icon').textContent = outOk ? '\u2713' : '\u2717';
+
+    // constraints
+    let nPass = 0;
+    document.getElementById('constraints').innerHTML = cstDefs.map(c => {
+      const ok = c.lhs() === c.rhs(); if (ok) nPass++;
+      return `<div class="cst ${ok ? 'pass' : 'fail'}">
+        <span class="cst-icon">${ok ? '\u2713' : '\u2717'}</span>
+        <span class="cst-eq">${c.eq}</span>
+        <span class="cst-detail">${c.detail()}</span>
+      </div>`;
+    }).join('');
+
+    // summary
+    const s = document.getElementById('summary');
+    const total = cstDefs.length;
+    if (nPass === total) {
+      s.className = 'summary pass';
+      s.textContent = `\u2713 Valid witness \u2014 all ${total} constraints satisfied`;
+    } else {
+      s.className = 'summary fail';
+      s.textContent = `\u2717 Invalid witness \u2014 ${total - nPass} of ${total} constraints violated`;
+    }
+  }
+
+  /* ── events ── */
+  document.getElementById('x-slider').addEventListener('input', e => {
+    x = parseInt(e.target.value);
+    v = honest(x);
+    tampered.clear();
+    render();
+  });
+
+  document.getElementById('btn-reset').addEventListener('click', () => {
+    v = honest(x);
+    tampered.clear();
+    render();
+  });
+
+  /* ── init ── */
+  buildCircuit();
+  render();
+})();
+</script>
+</body>
+</html>
