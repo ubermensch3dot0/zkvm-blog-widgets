@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fetch-Decode-Execute Cycle</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { background: #0d1117; color: #c9d1d9; overflow: hidden; }
+  body {
+    display: flex; justify-content: center;
+    padding: 24px 16px;
+    font-family: 'SF Mono','Fira Code','Cascadia Code','Consolas',monospace;
+  }
+  .container { max-width: 680px; width: 100%; }
+
+  /* Title */
+  .title {
+    text-align: center; color: #8b949e; font-size: 11px;
+    font-weight: 700; letter-spacing: 0.08em; margin-bottom: 18px;
+  }
+
+  /* Layout */
+  .main { display: flex; gap: 20px; }
+  .col-left { flex: 1; min-width: 0; }
+  .col-right { width: 160px; flex-shrink: 0; }
+
+  /* Program listing */
+  .program-label { font-size: 10px; color: #484f58; margin-bottom: 6px; letter-spacing: 0.05em; }
+  .program { background: #161b22; border: 1px solid #30363d; border-radius: 8px; overflow: hidden; }
+  .inst {
+    display: flex; align-items: center; padding: 6px 10px;
+    font-size: 12px; color: #8b949e; border-bottom: 1px solid #21262d;
+    transition: background 0.2s, color 0.2s;
+  }
+  .inst:last-child { border-bottom: none; }
+  .inst.active { background: #161b22; color: #c9d1d9; }
+  .inst-addr {
+    width: 20px; font-size: 10px; color: #484f58; flex-shrink: 0;
+  }
+  .inst.active .inst-addr { color: #58a6ff; }
+  .inst-pc {
+    width: 18px; flex-shrink: 0; font-size: 11px; color: transparent;
+  }
+  .inst.active .inst-pc { color: #58a6ff; }
+  .inst-op { color: inherit; }
+  .inst.active .inst-op { color: #d2a8ff; font-weight: 600; }
+  .inst-args { margin-left: 6px; }
+  .inst.active .inst-args { color: #c9d1d9; }
+  .inst.done { color: #484f58; }
+  .inst.done .inst-addr { color: #30363d; }
+
+  /* Registers */
+  .reg-label { font-size: 10px; color: #484f58; margin-bottom: 6px; letter-spacing: 0.05em; }
+  .registers { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 8px 10px; }
+  .reg-row {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 4px 0; font-size: 12px; color: #8b949e;
+  }
+  .reg-name { color: #484f58; width: 28px; }
+  .reg-val {
+    color: #8b949e; font-weight: 600;
+    transition: color 0.3s;
+  }
+  .reg-val.changed { color: #3fb950; }
+  .reg-val.read { color: #58a6ff; }
+
+  /* PC display */
+  .pc-box {
+    margin-top: 12px; background: #161b22; border: 1px solid #30363d;
+    border-radius: 8px; padding: 8px 10px;
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: 12px;
+  }
+  .pc-label { color: #484f58; }
+  .pc-val { color: #58a6ff; font-weight: 600; }
+
+  /* Phase indicator */
+  .phase-bar {
+    margin-top: 16px;
+    display: flex; gap: 3px; align-items: center; justify-content: center;
+  }
+  .phase {
+    font-size: 9px; padding: 4px 8px; border-radius: 4px;
+    color: #484f58; background: #0d1117; border: 1px solid #21262d;
+    transition: all 0.2s;
+  }
+  .phase.active { color: #c9d1d9; border-color: #58a6ff; background: #0d101a; }
+  .phase-arrow { color: #30363d; font-size: 9px; }
+
+  /* Controls */
+  .controls { display: flex; gap: 8px; margin-top: 14px; justify-content: center; }
+  .btn {
+    font-family: inherit; font-size: 11px; font-weight: 600;
+    padding: 6px 18px; border-radius: 6px; border: 1px solid #30363d;
+    background: #161b22; color: #c9d1d9; cursor: pointer;
+    transition: border-color 0.2s, background 0.2s;
+  }
+  .btn:hover { border-color: #58a6ff; background: #0d101a; }
+  .btn:disabled { opacity: 0.35; cursor: default; border-color: #30363d; background: #161b22; }
+  .btn-primary { border-color: #58a6ff; color: #58a6ff; }
+  .btn-primary:hover { background: #0d101a; }
+
+  /* Status line */
+  .status {
+    text-align: center; margin-top: 12px;
+    font-size: 11px; color: #484f58; min-height: 16px;
+    transition: color 0.2s;
+  }
+  .status.highlight { color: #8b949e; }
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="title">FETCH-DECODE-EXECUTE CYCLE</div>
+  <div class="main">
+    <div class="col-left">
+      <div class="program-label">PROGRAM</div>
+      <div class="program" id="program"></div>
+    </div>
+    <div class="col-right">
+      <div class="reg-label">REGISTERS</div>
+      <div class="registers" id="registers"></div>
+      <div class="pc-box">
+        <span class="pc-label">PC</span>
+        <span class="pc-val" id="pc-val">0</span>
+      </div>
+    </div>
+  </div>
+  <div class="phase-bar" id="phase-bar">
+    <span class="phase" data-phase="fetch">Fetch</span>
+    <span class="phase-arrow">›</span>
+    <span class="phase" data-phase="decode">Decode</span>
+    <span class="phase-arrow">›</span>
+    <span class="phase" data-phase="execute">Execute</span>
+    <span class="phase-arrow">›</span>
+    <span class="phase" data-phase="writeback">Write&nbsp;Back</span>
+  </div>
+  <div class="controls">
+    <button class="btn btn-primary" id="btn-step">Step</button>
+    <button class="btn" id="btn-reset">Reset</button>
+  </div>
+  <div class="status" id="status"></div>
+</div>
+
+<script>
+const PROGRAM = [
+  { op: 'IMM', args: 'r0, 3',       rd: 0, rs1: -1, rs2: -1, imm: 3, type: 'imm' },
+  { op: 'IMM', args: 'r1, 4',       rd: 1, rs1: -1, rs2: -1, imm: 4, type: 'imm' },
+  { op: 'ADD', args: 'r2, r0, r1',  rd: 2, rs1: 0,  rs2: 1,  imm: 0, type: 'alu' },
+  { op: 'MUL', args: 'r3, r2, r2',  rd: 3, rs1: 2,  rs2: 2,  imm: 0, type: 'alu' },
+  { op: 'SUB', args: 'r0, r3, r2',  rd: 0, rs1: 3,  rs2: 2,  imm: 0, type: 'alu' },
+  { op: 'HALT', args: '',           rd: -1, rs1: -1, rs2: -1, imm: 0, type: 'halt' },
+];
+
+let regs = [0, 0, 0, 0];
+let pc = 0;
+let phase = 0; // 0=idle, 1=fetch, 2=decode, 3=execute, 4=writeback
+let halted = false;
+let changedReg = -1;
+let readRegs = [];
+
+function render() {
+  // Program listing
+  const progEl = document.getElementById('program');
+  progEl.innerHTML = PROGRAM.map((inst, i) => {
+    let cls = 'inst';
+    if (i === pc && !halted) cls += ' active';
+    if (i < pc || halted) cls += ' done';
+    if (i === pc && !halted) cls += '';
+    return `<div class="${cls}">
+      <span class="inst-pc">${i === pc && !halted ? '▸' : ''}</span>
+      <span class="inst-addr">${i}</span>
+      <span class="inst-op">${inst.op}</span>
+      <span class="inst-args">${inst.args}</span>
+    </div>`;
+  }).join('');
+
+  // Registers
+  const regEl = document.getElementById('registers');
+  regEl.innerHTML = regs.map((v, i) => {
+    let valCls = 'reg-val';
+    if (changedReg === i) valCls += ' changed';
+    else if (readRegs.includes(i)) valCls += ' read';
+    return `<div class="reg-row">
+      <span class="reg-name">r${i}</span>
+      <span class="${valCls}">${v}</span>
+    </div>`;
+  }).join('');
+
+  // PC
+  document.getElementById('pc-val').textContent = pc;
+
+  // Phase bar
+  const phases = ['fetch', 'decode', 'execute', 'writeback'];
+  const phaseEls = document.querySelectorAll('.phase');
+  phaseEls.forEach((el, i) => {
+    el.classList.toggle('active', i === phase - 1);
+  });
+
+  // Buttons
+  document.getElementById('btn-step').disabled = halted;
+}
+
+function setStatus(text, highlight) {
+  const el = document.getElementById('status');
+  el.textContent = text;
+  el.className = highlight ? 'status highlight' : 'status';
+}
+
+function step() {
+  if (halted) return;
+
+  phase++;
+
+  if (phase === 1) {
+    // Fetch
+    changedReg = -1;
+    readRegs = [];
+    setStatus(`Fetch instruction at PC = ${pc}`, true);
+  }
+  else if (phase === 2) {
+    // Decode
+    const inst = PROGRAM[pc];
+    if (inst.type === 'halt') {
+      setStatus(`Decode: HALT`, true);
+    } else if (inst.type === 'imm') {
+      setStatus(`Decode: ${inst.op} → write ${inst.imm} to r${inst.rd}`, true);
+    } else {
+      setStatus(`Decode: ${inst.op} → read r${inst.rs1}, r${inst.rs2} → write r${inst.rd}`, true);
+      readRegs = [inst.rs1];
+      if (inst.rs2 !== inst.rs1) readRegs.push(inst.rs2);
+    }
+  }
+  else if (phase === 3) {
+    // Execute
+    const inst = PROGRAM[pc];
+    if (inst.type === 'halt') {
+      setStatus('Execute: halt the machine', true);
+    } else if (inst.type === 'imm') {
+      setStatus(`Execute: result = ${inst.imm}`, true);
+    } else {
+      const a = regs[inst.rs1], b = regs[inst.rs2];
+      let result;
+      if (inst.op === 'ADD') result = a + b;
+      else if (inst.op === 'MUL') result = a * b;
+      else if (inst.op === 'SUB') result = a - b;
+      setStatus(`Execute: ${a} ${inst.op === 'ADD' ? '+' : inst.op === 'MUL' ? '×' : '−'} ${b} = ${result}`, true);
+    }
+  }
+  else if (phase === 4) {
+    // Writeback
+    const inst = PROGRAM[pc];
+    readRegs = [];
+    if (inst.type === 'halt') {
+      halted = true;
+      phase = 0;
+      setStatus('Machine halted. Final state: r0 = ' + regs[0], false);
+    } else if (inst.type === 'imm') {
+      regs[inst.rd] = inst.imm;
+      changedReg = inst.rd;
+      setStatus(`Write back: r${inst.rd} ← ${inst.imm}, advance PC`, true);
+      pc++;
+      phase = 0;
+    } else {
+      const a = regs[inst.rs1], b = regs[inst.rs2];
+      let result;
+      if (inst.op === 'ADD') result = a + b;
+      else if (inst.op === 'MUL') result = a * b;
+      else if (inst.op === 'SUB') result = a - b;
+      regs[inst.rd] = result;
+      changedReg = inst.rd;
+      setStatus(`Write back: r${inst.rd} ← ${result}, advance PC`, true);
+      pc++;
+      phase = 0;
+    }
+  }
+
+  render();
+}
+
+function reset() {
+  regs = [0, 0, 0, 0];
+  pc = 0;
+  phase = 0;
+  halted = false;
+  changedReg = -1;
+  readRegs = [];
+  setStatus('', false);
+  render();
+}
+
+document.getElementById('btn-step').addEventListener('click', step);
+document.getElementById('btn-reset').addEventListener('click', reset);
+
+render();
+</script>
+</body>
+</html>
