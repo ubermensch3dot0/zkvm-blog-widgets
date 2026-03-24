@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VM Execution Trace Viewer</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { background: #0d1117; overflow-x: hidden; }
+body {
+  color: #e6edf3;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, sans-serif;
+  display: flex; justify-content: center;
+  padding: 24px 16px;
+}
+:root {
+  --bg: #0d1117; --card: #161b22; --border: #30363d; --border-light: #21262d;
+  --text: #e6edf3; --muted: #8b949e; --faint: #484f58;
+  --accent: #58a6ff; --purple: #d2a8ff; --orange: #ffa657;
+  --green: #3fb950; --red: #f85149;
+  --mono: 'SF Mono','Fira Code','Cascadia Code','Consolas',monospace;
+}
+.widget { max-width: 680px; width: 100%; }
+.title { font-size: 18px; font-weight: 600; margin-bottom: 6px; }
+.subtitle { font-size: 14px; color: var(--muted); margin-bottom: 20px; line-height: 1.5; }
+.subtitle code {
+  font-family: var(--mono); font-size: 12px;
+  background: var(--border-light); padding: 1px 5px; border-radius: 4px; color: var(--text);
+}
+
+/* Layout */
+.top-row { display: flex; gap: 12px; margin-bottom: 12px; }
+.panel {
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: 10px; padding: 14px;
+}
+.panel-title {
+  font-size: 10px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.08em; color: var(--muted); margin-bottom: 10px;
+}
+
+/* Program listing */
+.program-panel { flex: 1; min-width: 0; }
+.inst-row {
+  display: flex; align-items: center; gap: 8px;
+  padding: 4px 8px; border-radius: 6px;
+  font-family: var(--mono); font-size: 12px; color: var(--muted);
+  transition: all 0.15s;
+}
+.inst-row.active {
+  background: var(--accent)12; color: var(--text);
+}
+.inst-row.active .inst-pc { color: var(--accent); }
+.inst-row.done { opacity: 0.35; }
+.inst-pc { color: var(--faint); min-width: 18px; text-align: right; }
+.inst-op { color: var(--purple); font-weight: 600; min-width: 36px; }
+.inst-args { color: var(--text); }
+.inst-row.active .inst-op { color: var(--purple); }
+.pc-arrow { color: var(--accent); font-size: 11px; min-width: 14px; }
+
+/* Registers */
+.reg-panel { width: 190px; flex-shrink: 0; display: flex; flex-direction: column; }
+.regs { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 12px; }
+.reg {
+  background: var(--bg); border: 1px solid var(--border); border-radius: 6px;
+  padding: 6px 10px; font-family: var(--mono); font-size: 12px;
+  display: flex; justify-content: space-between;
+  transition: border-color 0.2s, background 0.2s;
+}
+.reg.changed { border-color: var(--green); background: #0f2d1640; }
+.reg-name { color: var(--muted); }
+.reg-val { color: var(--text); font-weight: 600; }
+.meta { display: flex; gap: 6px; }
+.meta-item {
+  flex: 1; background: var(--bg); border: 1px solid var(--border); border-radius: 6px;
+  padding: 4px 8px; font-family: var(--mono); font-size: 11px;
+  display: flex; justify-content: space-between;
+}
+.meta-label { color: var(--faint); }
+.meta-val { color: var(--accent); font-weight: 600; }
+
+/* Controls */
+.controls {
+  display: flex; gap: 8px; margin-bottom: 12px;
+}
+.btn {
+  font-family: inherit; font-size: 13px; font-weight: 500;
+  padding: 7px 16px; border-radius: 8px; border: 1px solid var(--border);
+  cursor: pointer; transition: all 0.15s;
+}
+.btn-primary {
+  background: var(--accent); color: #0d1117; border-color: var(--accent);
+}
+.btn-primary:hover { opacity: 0.85; }
+.btn-primary:disabled { opacity: 0.4; cursor: default; }
+.btn-secondary { background: var(--border-light); color: var(--muted); }
+.btn-secondary:hover { background: var(--border); color: var(--text); }
+.step-label {
+  display: flex; align-items: center;
+  font-size: 12px; color: var(--faint); margin-left: auto;
+  font-family: var(--mono);
+}
+
+/* Trace table */
+.trace-panel { overflow-x: auto; }
+.trace-table {
+  width: 100%; border-collapse: collapse;
+  font-family: var(--mono); font-size: 11px;
+}
+.trace-table th {
+  text-align: center; padding: 6px 8px; color: var(--muted);
+  font-size: 10px; font-weight: 600; letter-spacing: 0.04em;
+  border-bottom: 1px solid var(--border); white-space: nowrap;
+}
+.trace-table td {
+  text-align: center; padding: 5px 8px; color: var(--faint);
+  border-bottom: 1px solid var(--border-light); white-space: nowrap;
+}
+.trace-table tr.latest td { color: var(--text); background: var(--accent)08; }
+.trace-table td.op { color: var(--purple); font-weight: 600; }
+.trace-table td.highlight { color: var(--green); }
+.empty-trace {
+  text-align: center; padding: 24px; color: var(--faint); font-size: 13px;
+}
+</style>
+</head>
+<body>
+<div class="widget">
+  <div class="title">Execution Trace Viewer</div>
+  <p class="subtitle">
+    Step through the VM executing <code>3 &times; 5 + 7 = 22</code>.
+    Each step records the machine state <em>before</em> the instruction executes.
+  </p>
+
+  <div class="top-row">
+    <div class="panel program-panel">
+      <div class="panel-title">Program</div>
+      <div id="program"></div>
+    </div>
+    <div class="panel reg-panel">
+      <div class="panel-title">Registers</div>
+      <div class="regs" id="regs"></div>
+      <div class="meta">
+        <div class="meta-item"><span class="meta-label">PC</span><span class="meta-val" id="m-pc">0</span></div>
+        <div class="meta-item"><span class="meta-label">CLK</span><span class="meta-val" id="m-clk">0</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="controls">
+    <button class="btn btn-primary" id="btn-step">Step</button>
+    <button class="btn btn-secondary" id="btn-reset">Reset</button>
+    <button class="btn btn-secondary" id="btn-run">Run All</button>
+    <span class="step-label" id="status"></span>
+  </div>
+
+  <div class="panel trace-panel">
+    <div class="panel-title">Execution Trace</div>
+    <div id="trace-container"></div>
+  </div>
+</div>
+
+<script>
+(function() {
+  /* ── Program ── */
+  const prog = [
+    { op: 'IMM',  rd: 0, rs1: 0, rs2: 0, imm: 3, desc: 'r0, 3',       comment: 'r0 = 3' },
+    { op: 'IMM',  rd: 1, rs1: 0, rs2: 0, imm: 5, desc: 'r1, 5',       comment: 'r1 = 5' },
+    { op: 'MUL',  rd: 2, rs1: 0, rs2: 1, imm: 0, desc: 'r2, r0, r1',  comment: 'r2 = 15' },
+    { op: 'IMM',  rd: 3, rs1: 0, rs2: 0, imm: 7, desc: 'r3, 7',       comment: 'r3 = 7' },
+    { op: 'ADD',  rd: 2, rs1: 2, rs2: 3, imm: 0, desc: 'r2, r2, r3',  comment: 'r2 = 22' },
+    { op: 'HALT', rd: 0, rs1: 0, rs2: 0, imm: 0, desc: '',             comment: 'stop' },
+  ];
+
+  /* ── State ── */
+  let regs, pc, clk, halted, trace, prevRegs;
+
+  function init() {
+    regs = [0, 0, 0, 0];
+    prevRegs = [0, 0, 0, 0];
+    pc = 0; clk = 0; halted = false;
+    trace = [];
+  }
+
+  function step() {
+    if (halted) return;
+    const inst = prog[pc];
+    const rs1_val = regs[inst.rs1];
+    const rs2_val = regs[inst.rs2];
+
+    // Record state BEFORE execution
+    trace.push({
+      clk, pc, op: inst.op, rd: inst.rd,
+      r0: regs[0], r1: regs[1], r2: regs[2], r3: regs[3],
+    });
+
+    prevRegs = [...regs];
+
+    // Execute
+    switch (inst.op) {
+      case 'IMM':  regs[inst.rd] = inst.imm; break;
+      case 'ADD':  regs[inst.rd] = rs1_val + rs2_val; break;
+      case 'MUL':  regs[inst.rd] = rs1_val * rs2_val; break;
+      case 'SUB':  regs[inst.rd] = rs1_val - rs2_val; break;
+      case 'HALT': halted = true; break;
+    }
+
+    if (!halted) pc++;
+    clk++;
+  }
+
+  /* ── Render ── */
+  function renderProgram() {
+    document.getElementById('program').innerHTML = prog.map((inst, i) => {
+      let cls = '';
+      if (i === pc && !halted) cls = 'active';
+      else if (halted || i < pc) cls = 'done';
+      const arrow = (i === pc && !halted) ? '▸' : '';
+      return `<div class="inst-row ${cls}">
+        <span class="pc-arrow">${arrow}</span>
+        <span class="inst-pc">${i}</span>
+        <span class="inst-op">${inst.op}</span>
+        <span class="inst-args">${inst.desc}</span>
+      </div>`;
+    }).join('');
+  }
+
+  function renderRegs() {
+    document.getElementById('regs').innerHTML = [0,1,2,3].map(i => {
+      const changed = regs[i] !== prevRegs[i];
+      return `<div class="reg ${changed ? 'changed' : ''}">
+        <span class="reg-name">r${i}</span>
+        <span class="reg-val">${regs[i]}</span>
+      </div>`;
+    }).join('');
+    document.getElementById('m-pc').textContent = pc;
+    document.getElementById('m-clk').textContent = clk;
+  }
+
+  function renderTrace() {
+    const c = document.getElementById('trace-container');
+    if (trace.length === 0) {
+      c.innerHTML = '<div class="empty-trace">Press Step to begin execution</div>';
+      return;
+    }
+    let html = `<table class="trace-table">
+      <thead><tr>
+        <th>clk</th><th>pc</th><th>opcode</th><th>rd</th>
+        <th>r0</th><th>r1</th><th>r2</th><th>r3</th>
+      </tr></thead><tbody>`;
+
+    trace.forEach((r, i) => {
+      const latest = i === trace.length - 1;
+      html += `<tr class="${latest ? 'latest' : ''}">
+        <td>${r.clk}</td><td>${r.pc}</td>
+        <td class="op">${r.op}</td><td>r${r.rd}</td>
+        <td>${r.r0}</td><td>${r.r1}</td><td>${r.r2}</td><td>${r.r3}</td>
+      </tr>`;
+    });
+
+    html += '</tbody></table>';
+    c.innerHTML = html;
+  }
+
+  function renderStatus() {
+    const el = document.getElementById('status');
+    if (halted) {
+      el.innerHTML = '<span style="color:#3fb950">HALTED</span>';
+    } else if (trace.length === 0) {
+      el.textContent = 'Ready';
+    } else {
+      el.textContent = `Cycle ${clk}`;
+    }
+    document.getElementById('btn-step').disabled = halted;
+    document.getElementById('btn-run').disabled = halted;
+  }
+
+  function render() {
+    renderProgram(); renderRegs(); renderTrace(); renderStatus();
+  }
+
+  /* ── Events ── */
+  document.getElementById('btn-step').addEventListener('click', () => {
+    step(); render();
+  });
+
+  document.getElementById('btn-reset').addEventListener('click', () => {
+    init(); render();
+  });
+
+  document.getElementById('btn-run').addEventListener('click', () => {
+    let guard = 0;
+    while (!halted && guard++ < 100) step();
+    render();
+  });
+
+  /* ── Init ── */
+  init();
+  render();
+})();
+</script>
+</body>
+</html>
