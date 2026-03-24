@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Branching → Arithmetic</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { background: #0d1117; overflow-x: hidden; }
+body {
+  color: #e6edf3;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, sans-serif;
+  display: flex; justify-content: center;
+  padding: 24px 16px;
+}
+:root {
+  --bg: #0d1117; --card: #161b22; --border: #30363d;
+  --text: #e6edf3; --muted: #8b949e; --faint: #484f58;
+  --accent: #58a6ff; --purple: #d2a8ff; --orange: #ffa657;
+  --green: #3fb950; --red: #f85149;
+  --mono: 'SF Mono','Fira Code','Cascadia Code','Consolas',monospace;
+}
+.widget { max-width: 720px; width: 100%; }
+.title { font-size: 18px; font-weight: 600; margin-bottom: 6px; }
+.subtitle { font-size: 14px; color: var(--muted); margin-bottom: 20px; line-height: 1.5; }
+.panel {
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: 10px; padding: 16px; margin-bottom: 12px;
+}
+.panel-title {
+  font-size: 10px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.08em; color: var(--muted); margin-bottom: 12px;
+}
+
+.opcode-buttons { display: flex; gap: 6px; flex-wrap: wrap; }
+.op-btn {
+  background: var(--bg); border: 1px solid var(--border); border-radius: 6px;
+  color: var(--muted); font-family: var(--mono); font-size: 12px;
+  padding: 6px 12px; cursor: pointer; transition: all 0.15s;
+}
+.op-btn:hover { border-color: var(--accent); color: var(--text); }
+.op-btn.active {
+  background: rgba(88,166,255,0.12); border-color: var(--accent);
+  color: var(--accent); font-weight: 600;
+}
+
+.inputs-row { display: flex; gap: 12px; flex-wrap: wrap; }
+.input-group { display: flex; align-items: center; gap: 6px; }
+.input-group label { font-size: 12px; color: var(--muted); font-family: var(--mono); }
+.input-group input {
+  width: 60px; background: var(--bg); border: 1px solid var(--border);
+  border-radius: 4px; color: var(--text); font-family: var(--mono);
+  font-size: 13px; padding: 4px 6px; text-align: center;
+}
+.input-group input:focus { outline: none; border-color: var(--accent); }
+
+.side-by-side { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+@media (max-width: 600px) { .side-by-side { grid-template-columns: 1fr; } }
+
+.code-block {
+  background: var(--bg); border: 1px solid var(--border); border-radius: 8px;
+  padding: 12px; font-family: var(--mono); font-size: 11px; line-height: 1.7;
+}
+.code-line {
+  padding: 2px 6px; border-radius: 4px; transition: all 0.2s;
+  white-space: nowrap;
+}
+.code-line.active-branch {
+  background: rgba(63,185,80,0.12); color: var(--green);
+}
+.code-line.dimmed { opacity: 0.35; }
+.code-line .keyword { color: var(--purple); }
+.code-line .op-name { color: var(--orange); }
+.code-line .comment { color: var(--faint); }
+
+.alg-line {
+  display: flex; gap: 8px; padding: 3px 6px; border-radius: 4px;
+  font-family: var(--mono); font-size: 11px; transition: all 0.2s;
+  align-items: baseline;
+}
+.alg-line.active-term { background: rgba(63,185,80,0.12); }
+.alg-line.dimmed { opacity: 0.3; text-decoration: line-through; }
+.alg-sel { min-width: 28px; text-align: right; font-weight: 600; }
+.alg-expr { color: var(--muted); }
+.alg-val { margin-left: auto; font-weight: 600; min-width: 40px; text-align: right; }
+
+.result-box {
+  background: var(--bg); border: 1px solid var(--border); border-radius: 8px;
+  padding: 12px; text-align: center; font-family: var(--mono); font-size: 14px;
+  color: var(--green); font-weight: 600;
+}
+</style>
+</head>
+<body>
+<div class="widget">
+  <div class="title">Branching → Arithmetic</div>
+  <div class="subtitle">The Rust match picks one branch. The algebraic version computes all branches, multiplied by selectors, so only the matching term survives.</div>
+
+  <div class="panel">
+    <div class="panel-title">Opcode</div>
+    <div class="opcode-buttons" id="opBtns"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-title">Input Values</div>
+    <div class="inputs-row">
+      <div class="input-group"><label>rs1_val</label><input type="number" id="rs1" value="3"></div>
+      <div class="input-group"><label>rs2_val</label><input type="number" id="rs2" value="4"></div>
+      <div class="input-group"><label>imm</label><input type="number" id="imm" value="0"></div>
+    </div>
+  </div>
+
+  <div class="side-by-side">
+    <div class="panel">
+      <div class="panel-title">Rust Match (branching)</div>
+      <div class="code-block" id="rustCode"></div>
+    </div>
+    <div class="panel">
+      <div class="panel-title">Algebraic (selectors)</div>
+      <div class="code-block" id="algCode"></div>
+    </div>
+  </div>
+
+  <div class="result-box" id="resultBox"></div>
+</div>
+
+<script>
+const OPCODES = ['NOP','IMM','ADD','MUL','SUB','HALT'];
+let opcode = 2;
+
+const rustLines = [
+  { op: 0, code: '<span class="keyword">NOP</span>  → <span class="comment">/* nothing */</span>', hasResult: false },
+  { op: 1, code: '<span class="keyword">IMM</span>  → result = <span class="op-name">imm</span>', hasResult: true },
+  { op: 2, code: '<span class="keyword">ADD</span>  → result = <span class="op-name">rs1_val + rs2_val</span>', hasResult: true },
+  { op: 3, code: '<span class="keyword">MUL</span>  → result = <span class="op-name">rs1_val × rs2_val</span>', hasResult: true },
+  { op: 4, code: '<span class="keyword">SUB</span>  → result = <span class="op-name">rs1_val - rs2_val</span>', hasResult: true },
+  { op: 5, code: '<span class="keyword">HALT</span> → <span class="comment">/* nothing */</span>', hasResult: false },
+];
+
+function getInputs() {
+  return {
+    rs1: parseInt(document.getElementById('rs1').value) || 0,
+    rs2: parseInt(document.getElementById('rs2').value) || 0,
+    imm: parseInt(document.getElementById('imm').value) || 0,
+  };
+}
+
+function computeResult(op, inp) {
+  switch(op) {
+    case 0: return 0;
+    case 1: return inp.imm;
+    case 2: return inp.rs1 + inp.rs2;
+    case 3: return inp.rs1 * inp.rs2;
+    case 4: return inp.rs1 - inp.rs2;
+    case 5: return 0;
+  }
+}
+
+function termExpr(op, inp) {
+  switch(op) {
+    case 0: return { expr: '0', val: 0 };
+    case 1: return { expr: `${inp.imm}`, val: inp.imm };
+    case 2: return { expr: `${inp.rs1} + ${inp.rs2}`, val: inp.rs1 + inp.rs2 };
+    case 3: return { expr: `${inp.rs1} × ${inp.rs2}`, val: inp.rs1 * inp.rs2 };
+    case 4: return { expr: `${inp.rs1} - ${inp.rs2}`, val: inp.rs1 - inp.rs2 };
+    case 5: return { expr: '0', val: 0 };
+  }
+}
+
+function init() {
+  const btnContainer = document.getElementById('opBtns');
+  OPCODES.forEach((name, i) => {
+    const btn = document.createElement('button');
+    btn.className = 'op-btn';
+    btn.textContent = `${name} (${i})`;
+    btn.onclick = () => { opcode = i; update(); };
+    btnContainer.appendChild(btn);
+  });
+
+  ['rs1','rs2','imm'].forEach(id => {
+    document.getElementById(id).addEventListener('input', update);
+  });
+
+  update();
+}
+
+function update() {
+  const inp = getInputs();
+
+  // Buttons
+  document.querySelectorAll('.op-btn').forEach((btn, i) => {
+    btn.classList.toggle('active', i === opcode);
+  });
+
+  // Rust side
+  const rustEl = document.getElementById('rustCode');
+  rustEl.innerHTML = '<div class="code-line dimmed" style="color:var(--purple)">match opcode {</div>' +
+    rustLines.map(line => {
+      const cls = line.op === opcode ? 'code-line active-branch' : 'code-line dimmed';
+      return `<div class="${cls}">  ${line.code}</div>`;
+    }).join('') +
+    '<div class="code-line dimmed" style="color:var(--purple)">}</div>';
+
+  // Algebra side
+  const algEl = document.getElementById('algCode');
+  const names = ['nop','imm','add','mul','sub','halt'];
+  let lines = [];
+  let total = 0;
+  for (let i = 0; i < 6; i++) {
+    const sel = i === opcode ? 1 : 0;
+    const t = termExpr(i, inp);
+    const contribution = sel * t.val;
+    total += contribution;
+    const cls = i === opcode ? 'alg-line active-term' : 'alg-line dimmed';
+    const prefix = i === 0 ? '&nbsp;&nbsp;' : '+ ';
+    const selColor = sel === 1 ? 'var(--green)' : 'var(--faint)';
+    lines.push(`<div class="${cls}"><span class="alg-sel" style="color:${selColor}">${sel}</span><span class="alg-expr">${prefix}× sel_${names[i]} × (${t.expr})</span><span class="alg-val" style="color:${sel ? 'var(--green)' : 'var(--faint)'}">= ${contribution}</span></div>`);
+  }
+  algEl.innerHTML = lines.join('') +
+    `<div style="border-top:1px solid var(--border);margin-top:6px;padding-top:6px;font-family:var(--mono);font-size:12px;text-align:right;color:var(--green);font-weight:600">sum = ${total}</div>`;
+
+  // Result
+  const rustResult = computeResult(opcode, inp);
+  const isWriteOp = [1,2,3,4].includes(opcode);
+  const resultBox = document.getElementById('resultBox');
+  if (isWriteOp) {
+    resultBox.innerHTML = `Both compute the same result: <span style="color:var(--accent)">${rustResult}</span>`;
+  } else {
+    resultBox.innerHTML = `${OPCODES[opcode]} doesn't write to a register — no result to compute`;
+    resultBox.style.color = 'var(--muted)';
+  }
+  if (isWriteOp) resultBox.style.color = 'var(--green)';
+}
+
+init();
+</script>
+</body>
+</html>
