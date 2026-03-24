@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Constraint Evaluator</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { background: #0d1117; overflow-x: hidden; }
+body {
+  color: #e6edf3;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, sans-serif;
+  display: flex; justify-content: center;
+  padding: 24px 16px;
+}
+:root {
+  --bg: #0d1117; --card: #161b22; --border: #30363d;
+  --text: #e6edf3; --muted: #8b949e; --faint: #484f58;
+  --accent: #58a6ff; --purple: #d2a8ff; --orange: #ffa657;
+  --green: #3fb950; --red: #f85149;
+  --mono: 'SF Mono','Fira Code','Cascadia Code','Consolas',monospace;
+}
+.widget { max-width: 740px; width: 100%; }
+.title { font-size: 18px; font-weight: 600; margin-bottom: 6px; }
+.subtitle { font-size: 14px; color: var(--muted); margin-bottom: 20px; line-height: 1.5; }
+.panel {
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: 10px; padding: 16px; margin-bottom: 12px;
+}
+.panel-title {
+  font-size: 10px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.08em; color: var(--muted); margin-bottom: 12px;
+}
+.row-btns, .constraint-btns { display: flex; gap: 6px; flex-wrap: wrap; }
+.btn {
+  background: var(--bg); border: 1px solid var(--border); border-radius: 6px;
+  color: var(--muted); font-family: var(--mono); font-size: 11px;
+  padding: 5px 10px; cursor: pointer; transition: all 0.15s;
+}
+.btn:hover { border-color: var(--accent); color: var(--text); }
+.btn.active { background: rgba(88,166,255,0.12); border-color: var(--accent); color: var(--accent); font-weight: 600; }
+
+.trace-table { width: 100%; border-collapse: collapse; margin-bottom: 8px; }
+.trace-table th {
+  font-family: var(--mono); font-size: 9px; color: var(--faint);
+  padding: 4px 3px; text-align: center; font-weight: 600;
+  text-transform: uppercase; letter-spacing: 0.05em;
+}
+.trace-table td {
+  font-family: var(--mono); font-size: 11px; text-align: center;
+  padding: 6px 3px; border-top: 1px solid var(--border);
+  transition: all 0.2s;
+}
+.trace-table .row-label {
+  font-size: 10px; color: var(--muted); text-align: left; font-weight: 600;
+}
+.cell-highlight {
+  background: rgba(88,166,255,0.15); color: var(--accent); font-weight: 600;
+  border-radius: 3px;
+}
+.cell-highlight-next {
+  background: rgba(210,168,255,0.15); color: var(--purple); font-weight: 600;
+  border-radius: 3px;
+}
+
+.eval-box {
+  background: var(--bg); border: 1px solid var(--border); border-radius: 8px;
+  padding: 14px; font-family: var(--mono); font-size: 12px; line-height: 1.9;
+}
+.step { color: var(--muted); }
+.step .val { color: var(--text); }
+.step .highlight { color: var(--accent); font-weight: 600; }
+.final-result {
+  margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border);
+  font-size: 15px; font-weight: 700; text-align: center;
+}
+.final-result.pass { color: var(--green); }
+.final-result.fail { color: var(--red); }
+
+.break-toggle {
+  display: flex; align-items: center; gap: 10px; margin-top: 10px;
+}
+.break-toggle label { font-size: 12px; color: var(--muted); cursor: pointer; }
+.toggle-switch {
+  position: relative; width: 36px; height: 20px; cursor: pointer;
+}
+.toggle-switch input { opacity: 0; width: 0; height: 0; }
+.toggle-track {
+  position: absolute; inset: 0; background: var(--border); border-radius: 10px;
+  transition: background 0.2s;
+}
+.toggle-switch input:checked + .toggle-track { background: var(--red); }
+.toggle-dot {
+  position: absolute; top: 2px; left: 2px; width: 16px; height: 16px;
+  background: var(--text); border-radius: 50%; transition: transform 0.2s;
+}
+.toggle-switch input:checked ~ .toggle-dot { transform: translateX(16px); }
+</style>
+</head>
+<body>
+<div class="widget">
+  <div class="title">Constraint Evaluator</div>
+  <div class="subtitle">Pick a row transition and a constraint. See which cells feed into it and watch the step-by-step evaluation.</div>
+
+  <div class="panel">
+    <div class="panel-title">Row Transition</div>
+    <div class="row-btns" id="rowBtns"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-title">Trace Rows</div>
+    <table class="trace-table" id="traceTable"></table>
+    <div class="break-toggle">
+      <label class="toggle-switch">
+        <input type="checkbox" id="breakToggle">
+        <span class="toggle-track"></span>
+        <span class="toggle-dot"></span>
+      </label>
+      <label for="breakToggle">Corrupt a value in the next row</label>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-title">Constraint</div>
+    <div class="constraint-btns" id="constraintBtns"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-title">Evaluation</div>
+    <div class="eval-box" id="evalBox">Select a constraint above to see the evaluation.</div>
+  </div>
+</div>
+
+<script>
+const COLS = ['clk','pc','op','rd','rs1','rs2','imm','r0','r1','r2','r3','rs1_val','rs2_val'];
+const OP_NAMES = ['NOP','IMM','ADD','MUL','SUB','HALT'];
+const CONSTRAINTS = [
+  { id: 'C0', label: 'C0: Clock +1' },
+  { id: 'C1', label: 'C1: PC update' },
+  { id: 'C2', label: 'C2: r0' },
+  { id: 'C3', label: 'C3: r1' },
+  { id: 'C4', label: 'C4: r2' },
+  { id: 'C5', label: 'C5: r3' },
+  { id: 'C6', label: 'C6: rs1 lookup' },
+  { id: 'C7', label: 'C7: rs2 lookup' },
+];
+
+const TRACE = [
+  [0,0,1,0,0,0,3, 0,0,0,0, 0,0],
+  [1,1,1,1,0,0,4, 3,0,0,0, 3,3],
+  [2,2,2,2,0,1,0, 3,4,0,0, 3,4],
+  [3,3,3,3,2,2,0, 3,4,7,0, 7,7],
+  [4,4,4,0,3,2,0, 3,4,7,49, 49,7],
+  [5,5,5,0,0,0,0, 42,4,7,49, 42,42],
+];
+
+let rowIdx = 2;
+let constraintIdx = 0;
+let broken = false;
+let brokenCol = 9; // r2
+let brokenVal = 99;
+
+function init() {
+  const rowContainer = document.getElementById('rowBtns');
+  for (let i = 0; i < 5; i++) {
+    const btn = document.createElement('button');
+    btn.className = 'btn';
+    btn.textContent = `Row ${i} → ${i+1}`;
+    btn.onclick = () => { rowIdx = i; update(); };
+    rowContainer.appendChild(btn);
+  }
+
+  const cContainer = document.getElementById('constraintBtns');
+  CONSTRAINTS.forEach((c, i) => {
+    const btn = document.createElement('button');
+    btn.className = 'btn';
+    btn.textContent = c.label;
+    btn.onclick = () => { constraintIdx = i; update(); };
+    cContainer.appendChild(btn);
+  });
+
+  document.getElementById('breakToggle').addEventListener('change', e => {
+    broken = e.target.checked;
+    update();
+  });
+
+  update();
+}
+
+function getRow(idx) {
+  const row = [...TRACE[idx]];
+  if (broken && idx === rowIdx + 1) {
+    row[brokenCol] = brokenVal;
+  }
+  return row;
+}
+
+function highlightCols(ci) {
+  // Returns {current: [col indices], next: [col indices]}
+  switch(ci) {
+    case 0: return { current: [0], next: [0] };
+    case 1: return { current: [2,1], next: [1] };
+    case 2: return { current: [2,3,6,7,11,12], next: [7] };
+    case 3: return { current: [2,3,6,8,11,12], next: [8] };
+    case 4: return { current: [2,3,6,9,11,12], next: [9] };
+    case 5: return { current: [2,3,6,10,11,12], next: [10] };
+    case 6: return { current: [4,7,8,9,10,11], next: [] };
+    case 7: return { current: [5,7,8,9,10,12], next: [] };
+    default: return { current: [], next: [] };
+  }
+}
+
+function opSel(opVal, target) { return opVal === target ? 1 : 0; }
+function regSel(rdVal, target) { return rdVal === target ? 1 : 0; }
+
+function evaluate(ci, cur, nxt) {
+  const op = cur[2], rd = cur[3], imm = cur[6];
+  const rs1v = cur[11], rs2v = cur[12];
+  const s = [0,1,2,3,4,5].map(t => opSel(op, t));
+  const isWrite = s[1]+s[2]+s[3]+s[4];
+  const writeVal = s[1]*imm + s[2]*(rs1v+rs2v) + s[3]*(rs1v*rs2v) + s[4]*(rs1v-rs2v);
+
+  let steps = [];
+  let result;
+
+  switch(ci) {
+    case 0:
+      result = nxt[0] - cur[0] - 1;
+      steps.push(`next.clk - current.clk - 1`);
+      steps.push(`= ${nxt[0]} - ${cur[0]} - 1`);
+      steps.push(`= ${result}`);
+      break;
+    case 1: {
+      const sNopHalt = s[0]+s[5];
+      const sWrite = s[1]+s[2]+s[3]+s[4];
+      result = sNopHalt*(nxt[1]-cur[1]) + sWrite*(nxt[1]-cur[1]-1);
+      steps.push(`Opcode: ${OP_NAMES[op]} → sel_nop+sel_halt = ${sNopHalt}, sel_write = ${sWrite}`);
+      if (sNopHalt) {
+        steps.push(`PC should stay: next.pc - current.pc = ${nxt[1]} - ${cur[1]} = ${nxt[1]-cur[1]}`);
+      } else {
+        steps.push(`PC should increment: next.pc - current.pc - 1 = ${nxt[1]} - ${cur[1]} - 1 = ${nxt[1]-cur[1]-1}`);
+      }
+      steps.push(`Result: ${result}`);
+      break;
+    }
+    case 2: case 3: case 4: case 5: {
+      const ri = ci - 2;
+      const selI = regSel(rd, ri);
+      const curRi = cur[7+ri];
+      const nxtRi = nxt[7+ri];
+      result = nxtRi - curRi - selI * isWrite * (writeVal - curRi);
+      steps.push(`Register: r${ri}`);
+      steps.push(`reg_selector(rd=${rd}, target=${ri}) = ${selI}`);
+      steps.push(`is_write = ${isWrite}  (opcode ${OP_NAMES[op]})`);
+      steps.push(`write_val = ${writeVal}`);
+      steps.push(`next.r${ri} - current.r${ri} - sel × is_write × (write_val - current.r${ri})`);
+      steps.push(`= ${nxtRi} - ${curRi} - ${selI} × ${isWrite} × (${writeVal} - ${curRi})`);
+      steps.push(`= ${nxtRi} - ${curRi} - ${selI * isWrite * (writeVal - curRi)}`);
+      steps.push(`= ${result}`);
+      break;
+    }
+    case 6: {
+      const rs1Idx = cur[4];
+      let expected = 0;
+      let parts = [];
+      for (let i = 0; i < 4; i++) {
+        const sel = regSel(rs1Idx, i);
+        expected += sel * cur[7+i];
+        parts.push(`sel(${rs1Idx},${i})=${sel} × r${i}=${cur[7+i]}`);
+      }
+      result = cur[11] - expected;
+      steps.push(`rs1 index = ${rs1Idx}`);
+      steps.push(...parts);
+      steps.push(`Expected rs1_val = ${expected}`);
+      steps.push(`Actual rs1_val = ${cur[11]}`);
+      steps.push(`Difference: ${cur[11]} - ${expected} = ${result}`);
+      break;
+    }
+    case 7: {
+      const rs2Idx = cur[5];
+      let expected = 0;
+      let parts = [];
+      for (let i = 0; i < 4; i++) {
+        const sel = regSel(rs2Idx, i);
+        expected += sel * cur[7+i];
+        parts.push(`sel(${rs2Idx},${i})=${sel} × r${i}=${cur[7+i]}`);
+      }
+      result = cur[12] - expected;
+      steps.push(`rs2 index = ${rs2Idx}`);
+      steps.push(...parts);
+      steps.push(`Expected rs2_val = ${expected}`);
+      steps.push(`Actual rs2_val = ${cur[12]}`);
+      steps.push(`Difference: ${cur[12]} - ${expected} = ${result}`);
+      break;
+    }
+  }
+  return { result, steps };
+}
+
+function update() {
+  // Buttons
+  document.querySelectorAll('#rowBtns .btn').forEach((btn, i) => btn.classList.toggle('active', i === rowIdx));
+  document.querySelectorAll('#constraintBtns .btn').forEach((btn, i) => btn.classList.toggle('active', i === constraintIdx));
+
+  // Determine broken column based on transition
+  const nextOp = TRACE[rowIdx][2];
+  if (nextOp === 2) { brokenCol = 9; brokenVal = 99; }
+  else if (nextOp === 1 && rowIdx === 0) { brokenCol = 7; brokenVal = 99; }
+  else if (nextOp === 1 && rowIdx === 1) { brokenCol = 8; brokenVal = 99; }
+  else if (nextOp === 3) { brokenCol = 10; brokenVal = 99; }
+  else if (nextOp === 4) { brokenCol = 7; brokenVal = 99; }
+  else { brokenCol = 7; brokenVal = 99; }
+
+  const cur = getRow(rowIdx);
+  const nxt = getRow(rowIdx + 1);
+  const hl = highlightCols(constraintIdx);
+
+  // Table
+  const table = document.getElementById('traceTable');
+  let html = '<tr><th></th>';
+  COLS.forEach(c => html += `<th>${c}</th>`);
+  html += '</tr>';
+
+  html += `<tr><td class="row-label">Row ${rowIdx}</td>`;
+  cur.forEach((v, ci) => {
+    const cls = hl.current.includes(ci) ? 'cell-highlight' : '';
+    html += `<td class="${cls}">${v}</td>`;
+  });
+  html += '</tr>';
+
+  html += `<tr><td class="row-label">Row ${rowIdx+1}</td>`;
+  nxt.forEach((v, ci) => {
+    const cls = hl.next.includes(ci) ? 'cell-highlight-next' : '';
+    const orig = TRACE[rowIdx+1][ci];
+    const isBroken = broken && rowIdx + 1 <= 5 && ci === brokenCol && v !== orig;
+    const style = isBroken ? 'color:var(--red);font-weight:700' : '';
+    html += `<td class="${cls}" style="${style}">${v}</td>`;
+  });
+  html += '</tr>';
+  table.innerHTML = html;
+
+  // Evaluation
+  const { result, steps } = evaluate(constraintIdx, cur, nxt);
+  const evalBox = document.getElementById('evalBox');
+  const pass = result === 0;
+  evalBox.innerHTML = steps.map(s => `<div class="step">${s}</div>`).join('') +
+    `<div class="final-result ${pass ? 'pass' : 'fail'}">${pass ? '✓ Constraint satisfied (= 0)' : `✗ Constraint violated (= ${result})`}</div>`;
+}
+
+init();
+</script>
+</body>
+</html>
