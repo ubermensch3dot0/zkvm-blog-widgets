@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Selector Polynomial Visualizer</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { background: #0d1117; overflow-x: hidden; }
+body {
+  color: #e6edf3;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, sans-serif;
+  display: flex; justify-content: center;
+  padding: 24px 16px;
+}
+:root {
+  --bg: #0d1117; --card: #161b22; --border: #30363d;
+  --text: #e6edf3; --muted: #8b949e; --faint: #484f58;
+  --accent: #58a6ff; --purple: #d2a8ff; --orange: #ffa657;
+  --green: #3fb950; --red: #f85149;
+  --mono: 'SF Mono','Fira Code','Cascadia Code','Consolas',monospace;
+}
+.widget { max-width: 680px; width: 100%; }
+.title { font-size: 18px; font-weight: 600; margin-bottom: 6px; }
+.subtitle { font-size: 14px; color: var(--muted); margin-bottom: 20px; line-height: 1.5; }
+.panel {
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: 10px; padding: 16px; margin-bottom: 12px;
+}
+.panel-title {
+  font-size: 10px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.08em; color: var(--muted); margin-bottom: 12px;
+}
+
+/* Target picker */
+.target-buttons { display: flex; gap: 6px; flex-wrap: wrap; }
+.target-btn {
+  background: var(--bg); border: 1px solid var(--border); border-radius: 6px;
+  color: var(--muted); font-family: var(--mono); font-size: 12px;
+  padding: 6px 12px; cursor: pointer; transition: all 0.15s;
+}
+.target-btn:hover { border-color: var(--accent); color: var(--text); }
+.target-btn.active {
+  background: rgba(88,166,255,0.12); border-color: var(--accent);
+  color: var(--accent); font-weight: 600;
+}
+
+/* Bar chart */
+.bars-container {
+  display: flex; align-items: flex-end; justify-content: center;
+  gap: 12px; height: 140px; padding: 0 20px; margin-bottom: 8px;
+}
+.bar-wrapper { display: flex; flex-direction: column; align-items: center; gap: 4px; flex: 1; }
+.bar {
+  width: 100%; border-radius: 4px 4px 0 0;
+  transition: height 0.3s ease, background 0.3s ease;
+  min-height: 2px; position: relative;
+}
+.bar-value {
+  position: absolute; top: -20px; left: 50%; transform: translateX(-50%);
+  font-family: var(--mono); font-size: 11px; font-weight: 600;
+  transition: color 0.3s;
+}
+.bar-label {
+  font-family: var(--mono); font-size: 11px; color: var(--muted);
+  text-align: center; transition: color 0.15s;
+}
+.bar-label.active { color: var(--accent); font-weight: 600; }
+
+/* Formula */
+.formula-box {
+  background: var(--bg); border: 1px solid var(--border); border-radius: 8px;
+  padding: 14px; font-family: var(--mono); font-size: 13px;
+  line-height: 1.8; text-align: center;
+}
+.formula-num { color: var(--text); }
+.formula-den { color: var(--muted); }
+.formula-divider {
+  border: none; border-top: 1px solid var(--faint);
+  margin: 4px 40px;
+}
+.factor { transition: all 0.2s; }
+.factor.removed {
+  text-decoration: line-through; color: var(--red); opacity: 0.5;
+}
+.factor.highlight { color: var(--green); font-weight: 600; }
+
+/* Slider section */
+.slider-row { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
+.slider-label { font-size: 13px; color: var(--muted); white-space: nowrap; }
+.slider {
+  flex: 1; -webkit-appearance: none; appearance: none;
+  height: 6px; background: var(--border); border-radius: 3px; outline: none;
+}
+.slider::-webkit-slider-thumb {
+  -webkit-appearance: none; width: 18px; height: 18px;
+  background: var(--accent); border-radius: 50%; cursor: pointer;
+}
+.slider-value {
+  font-family: var(--mono); font-size: 14px; font-weight: 600;
+  min-width: 24px; text-align: center;
+}
+
+/* Evaluation steps */
+.eval-steps {
+  background: var(--bg); border: 1px solid var(--border); border-radius: 8px;
+  padding: 12px; font-family: var(--mono); font-size: 12px; line-height: 1.9;
+}
+.eval-step { display: flex; gap: 8px; }
+.eval-label { color: var(--muted); min-width: 90px; }
+.eval-val { color: var(--text); }
+.eval-result {
+  margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border);
+  font-size: 14px; font-weight: 600;
+}
+.eval-result.zero { color: var(--green); }
+.eval-result.one { color: var(--green); }
+.eval-result.other { color: var(--orange); }
+</style>
+</head>
+<body>
+<div class="widget">
+  <div class="title">Selector Polynomial</div>
+  <div class="subtitle">Pick a target opcode. The selector equals 1 for that opcode and 0 for all others.</div>
+
+  <div class="panel">
+    <div class="panel-title">Target Opcode</div>
+    <div class="target-buttons" id="targetBtns"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-title">Selector Values</div>
+    <div class="bars-container" id="bars"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-title">Algebraic Expression</div>
+    <div class="formula-box" id="formula"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-title">Evaluate at a Specific Opcode</div>
+    <div class="slider-row">
+      <span class="slider-label">opcode =</span>
+      <input type="range" class="slider" id="opcodeSlider" min="0" max="5" step="1" value="2">
+      <span class="slider-value" id="sliderVal">2</span>
+    </div>
+    <div class="eval-steps" id="evalSteps"></div>
+  </div>
+</div>
+
+<script>
+const OPCODES = ['NOP','IMM','ADD','MUL','SUB','HALT'];
+let target = 2;
+let evalAt = 2;
+
+function init() {
+  const btnContainer = document.getElementById('targetBtns');
+  OPCODES.forEach((name, i) => {
+    const btn = document.createElement('button');
+    btn.className = 'target-btn';
+    btn.textContent = `${name} (${i})`;
+    btn.onclick = () => { target = i; update(); };
+    btnContainer.appendChild(btn);
+  });
+
+  const barsContainer = document.getElementById('bars');
+  OPCODES.forEach((name, i) => {
+    const w = document.createElement('div');
+    w.className = 'bar-wrapper';
+    w.innerHTML = `<div class="bar" id="bar${i}"><span class="bar-value" id="barVal${i}">0</span></div><div class="bar-label" id="barLbl${i}">${name}<br><span style="font-size:10px;color:var(--faint)">(${i})</span></div>`;
+    barsContainer.appendChild(w);
+  });
+
+  document.getElementById('opcodeSlider').addEventListener('input', e => {
+    evalAt = parseInt(e.target.value);
+    document.getElementById('sliderVal').textContent = evalAt;
+    updateEval();
+  });
+
+  update();
+}
+
+function update() {
+  // Buttons
+  document.querySelectorAll('.target-btn').forEach((btn, i) => {
+    btn.classList.toggle('active', i === target);
+  });
+
+  // Bars
+  OPCODES.forEach((_, i) => {
+    const bar = document.getElementById(`bar${i}`);
+    const val = document.getElementById(`barVal${i}`);
+    const lbl = document.getElementById(`barLbl${i}`);
+    const isTarget = i === target;
+    bar.style.height = isTarget ? '100px' : '2px';
+    bar.style.background = isTarget ? 'var(--green)' : 'var(--faint)';
+    val.textContent = isTarget ? '1' : '0';
+    val.style.color = isTarget ? 'var(--green)' : 'var(--faint)';
+    lbl.classList.toggle('active', isTarget);
+  });
+
+  // Formula
+  updateFormula();
+  updateEval();
+}
+
+function updateFormula() {
+  const f = document.getElementById('formula');
+  let numParts = [];
+  let denParts = [];
+  let allParts = [];
+
+  for (let v = 0; v < 6; v++) {
+    const factor = `(op - ${v})`;
+    const denFactor = `(${target} - ${v})`;
+    if (v === target) {
+      allParts.push(`<span class="factor removed">${factor}</span>`);
+    } else {
+      numParts.push(`<span class="factor">${factor}</span>`);
+      denParts.push(`<span class="factor">${denFactor}</span>`);
+    }
+  }
+
+  f.innerHTML = `
+    <div style="margin-bottom:4px;color:var(--muted);font-size:11px;">
+      Full product with <span style="color:var(--red);text-decoration:line-through">(op - ${target})</span> removed:
+    </div>
+    <div class="formula-num">${numParts.join(' · ')}</div>
+    <hr class="formula-divider">
+    <div class="formula-den">${denParts.join(' · ')}</div>
+  `;
+}
+
+function updateEval() {
+  const el = document.getElementById('evalSteps');
+  let steps = [];
+  let numVal = 1;
+  let denVal = 1;
+
+  steps.push('<div style="margin-bottom:6px;color:var(--muted);">Numerator factors:</div>');
+  for (let v = 0; v < 6; v++) {
+    if (v === target) continue;
+    const factorVal = evalAt - v;
+    numVal *= factorVal;
+    const color = factorVal === 0 ? 'var(--red)' : 'var(--text)';
+    steps.push(`<div class="eval-step"><span class="eval-label">  (${evalAt} - ${v})</span><span class="eval-val" style="color:${color}">= ${factorVal}</span></div>`);
+  }
+  steps.push(`<div class="eval-step" style="margin-top:4px"><span class="eval-label">  Product</span><span class="eval-val">= ${numVal}</span></div>`);
+
+  steps.push('<div style="margin-top:10px;margin-bottom:6px;color:var(--muted);">Denominator factors:</div>');
+  for (let v = 0; v < 6; v++) {
+    if (v === target) continue;
+    const factorVal = target - v;
+    denVal *= factorVal;
+    steps.push(`<div class="eval-step"><span class="eval-label">  (${target} - ${v})</span><span class="eval-val">= ${factorVal}</span></div>`);
+  }
+  steps.push(`<div class="eval-step" style="margin-top:4px"><span class="eval-label">  Product</span><span class="eval-val">= ${denVal}</span></div>`);
+
+  const result = denVal === 0 ? 'undefined' : numVal / denVal;
+  const resultStr = typeof result === 'number' ? (Number.isInteger(result) ? result : result.toFixed(4)) : result;
+  let resultClass = 'other';
+  if (result === 0) resultClass = 'zero';
+  else if (result === 1) resultClass = 'one';
+
+  let resultLabel = '';
+  if (result === 1) resultLabel = `selector(${evalAt}) = 1  →  opcode matches target!`;
+  else if (result === 0) resultLabel = `selector(${evalAt}) = 0  →  not the target opcode`;
+  else resultLabel = `selector(${evalAt}) = ${resultStr}`;
+
+  steps.push(`<div class="eval-result ${resultClass}">${resultLabel}</div>`);
+
+  el.innerHTML = steps.join('');
+}
+
+init();
+</script>
+</body>
+</html>
