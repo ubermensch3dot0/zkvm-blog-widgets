@@ -128,7 +128,7 @@ body {
 <div class="widget">
   <div class="title">Execution Trace Viewer</div>
   <p class="subtitle">
-    Step through the VM executing <code>3 &times; 5 + 7 = 22</code>.
+    Step through the VM executing <code>(3 + 4)&sup2; &minus; (3 + 4) = 42</code>.
     Each step records the machine state <em>before</em> the instruction executes.
   </p>
 
@@ -165,10 +165,10 @@ body {
   /* ── Program ── */
   const prog = [
     { op: 'IMM',  rd: 0, rs1: 0, rs2: 0, imm: 3, desc: 'r0, 3',       comment: 'r0 = 3' },
-    { op: 'IMM',  rd: 1, rs1: 0, rs2: 0, imm: 5, desc: 'r1, 5',       comment: 'r1 = 5' },
-    { op: 'MUL',  rd: 2, rs1: 0, rs2: 1, imm: 0, desc: 'r2, r0, r1',  comment: 'r2 = 15' },
-    { op: 'IMM',  rd: 3, rs1: 0, rs2: 0, imm: 7, desc: 'r3, 7',       comment: 'r3 = 7' },
-    { op: 'ADD',  rd: 2, rs1: 2, rs2: 3, imm: 0, desc: 'r2, r2, r3',  comment: 'r2 = 22' },
+    { op: 'IMM',  rd: 1, rs1: 0, rs2: 0, imm: 4, desc: 'r1, 4',       comment: 'r1 = 4' },
+    { op: 'ADD',  rd: 2, rs1: 0, rs2: 1, imm: 0, desc: 'r2, r0, r1',  comment: 'r2 = 7' },
+    { op: 'MUL',  rd: 3, rs1: 2, rs2: 2, imm: 0, desc: 'r3, r2, r2',  comment: 'r3 = 49' },
+    { op: 'SUB',  rd: 0, rs1: 3, rs2: 2, imm: 0, desc: 'r0, r3, r2',  comment: 'r0 = 42' },
     { op: 'HALT', rd: 0, rs1: 0, rs2: 0, imm: 0, desc: '',             comment: 'stop' },
   ];
 
